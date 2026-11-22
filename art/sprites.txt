@@ -12,6 +12,7 @@
 #  !  lit window (warm yellow, flickers now and then)
 #  s  settled snow on a tree: white, but only once it has snowed in this scene; before
 #     that nothing, or the sprite's bare color ("@tree_small bare=G": branch tips)
+#  ~  settled snow that hangs over nothing, even on a sprite with a bare color
 
 # ---------------------------------------------------------------- walkers
 
@@ -519,11 +520,11 @@ ssssssGGGssssss
 @tree_mid bare=g
 .....s.....
 ....sgs....
-...gggggs..
+...ggggg~..
 ..ssgggss..
 ....ggg....
 ...ggggg...
-..gggggggs.
+..ggggggg~.
 .ssgggggss.
 ...ggggg...
 ..ggggggg..

@@ -13,6 +13,7 @@ Pixel encoding in the generated table:
     202         settled snow ('s': white once a snowfall has built it up, else nothing)
     210 + i     settled snow over palette color i: that color until snow covers it
                 (a sprite headed "@name bare=G" has its 's' pixels over G)
+    ('~' is settled snow over nothing, whatever the sprite's bare color)
 """
 import argparse
 import pathlib
@@ -100,6 +101,8 @@ def encode(ch, where, bare=None):
         return WINDOW
     if ch == "s":
         return SETTLED_ON + CHAR_INDEX[bare] if bare else SETTLED
+    if ch == "~":
+        return SETTLED
     if ch in CHAR_INDEX:
         return CHAR_INDEX[ch] + 1
     sys.exit(f"{where}: unknown pixel '{ch}'")
@@ -173,7 +176,7 @@ def write_sheet(path, sprites, scale=6):
                         col = PALETTE[CHAR_INDEX[ch]][2]
                     elif ch in "1234":
                         col = slot_demo[int(ch) - 1]
-                    elif ch == "s":
+                    elif ch in "s~":
                         col = PALETTE[CHAR_INDEX["W"]][2]
                     elif ch == "*":
                         col = [(0xD8, 0x38, 0x34), (0xFC, 0xE0, 0x5C), (0x40, 0x60, 0xE0), (0x54, 0xD4, 0xD4)][(x + y) % 4]
