@@ -159,13 +159,15 @@ static void blit(Scene *s, unsigned char *fb, short spr, short x, short y, short
                 row[xx] = (unsigned char)(px - 1);
             } else if (px < PX_TWINKLE) {
                 row[xx] = slots ? slots[px - PX_SLOT] : C_WHITE;
-            } else if (px == PX_SETTLED) {
-                /* snow settles on a tree a pixel at a time, in an order fixed per tree */
+            } else if (px == PX_SETTLED || px >= PX_SETTLED_ON) {
+                /* snow settles on a tree a pixel at a time, in an order fixed per tree,
+                   over the branch tips (or nothing) it covers */
                 unsigned short k = (unsigned short)(c * 181 + r * 97 + x * 59);
                 k ^= (unsigned short)(k >> 5);
                 k = (unsigned short)(k * 0x2F);
                 k ^= (unsigned short)(k >> 7);
                 if ((short)(k & 4095) < s->treeSnow) row[xx] = C_WHITE;
+                else if (px >= PX_SETTLED_ON) row[xx] = (unsigned char)(px - PX_SETTLED_ON);
             } else if (px == PX_TWINKLE) {
                 /* each bulb steps through the colors on its own phase */
                 unsigned short k = (unsigned short)(xx * 3 + yy * 5 + slowTick);

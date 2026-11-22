@@ -10,7 +10,9 @@ Pixel encoding in the generated table:
     100 + k     per-instance color slot k (art chars '1'..'4' -> k = 0..3)
     200         twinkling light ('*')
     201         lit window ('!')
-    202         settled snow ('s': white once a snowfall has built it up)
+    202         settled snow ('s': white once a snowfall has built it up, else nothing)
+    210 + i     settled snow over palette color i: that color until snow covers it
+                (a sprite headed "@name bare=G" has its 's' pixels over G)
 """
 import argparse
 import pathlib
@@ -49,7 +51,9 @@ PALETTE = [
     (None, "SKIN3",    (0xB4, 0x78, 0x4C)),
 ]
 CHAR_INDEX = {c: i for i, (c, _, _) in enumerate(PALETTE) if c}
-SLOT_BASE, TWINKLE, WINDOW, SETTLED = 100, 200, 201, 202
+SLOT_BASE, TWINKLE, WINDOW, SETTLED, SETTLED_ON = 100, 200, 201, 202, 210
+assert SETTLED_ON + len(PALETTE) <= 256
+BARE = {}   # sprite name -> the color its settled snow covers
 
 
 def parse(path):
@@ -67,7 +71,13 @@ def parse(path):
             continue
         if line.startswith("@"):
             flush()
-            name, rows = line[1:].strip(), []
+            words = line[1:].split()
+            name, rows = words[0], []
+            for opt in words[1:]:
+                key, _, val = opt.partition("=")
+                if key != "bare" or val not in CHAR_INDEX:
+                    sys.exit(f"{path}:{lineno}: bad option '{opt}'")
+                BARE[name] = val
         elif line == "":
             flush()
             name, rows = None, []
@@ -79,7 +89,7 @@ def parse(path):
     return sprites
 
 
-def encode(ch, where):
+def encode(ch, where, bare=None):
     if ch == ".":
         return 0
     if ch in "1234":
@@ -89,7 +99,7 @@ def encode(ch, where):
     if ch == "!":
         return WINDOW
     if ch == "s":
-        return SETTLED
+        return SETTLED_ON + CHAR_INDEX[bare] if bare else SETTLED
     if ch in CHAR_INDEX:
         return CHAR_INDEX[ch] + 1
     sys.exit(f"{where}: unknown pixel '{ch}'")
@@ -104,7 +114,8 @@ def build(sprites):
         table.append((name, w, h, len(out)))
         for y, r in enumerate(rows):
             for x in range(w):
-                out.append(encode(r[x] if x < len(r) else ".", f"{name} row {y}"))
+                out.append(encode(r[x] if x < len(r) else ".", f"{name} row {y}",
+                                  BARE.get(name)))
     return out, table
 
 
@@ -115,7 +126,7 @@ def write_header(path, data, table):
         L.append(f"#define C_{cname} {i}")
     L.append(f"#define NUM_COLORS {len(PALETTE)}")
     L.append(f"#define PX_SLOT {SLOT_BASE}\n#define PX_TWINKLE {TWINKLE}\n#define PX_WINDOW {WINDOW}\n"
-             f"#define PX_SETTLED {SETTLED}\n")
+             f"#define PX_SETTLED {SETTLED}\n#define PX_SETTLED_ON {SETTLED_ON}\n")
     L.append("static const unsigned char PAL_RGB[NUM_COLORS][3] = {")
     L += [f"    {{0x{r:02X}, 0x{g:02X}, 0x{b:02X}}}, /* {n} */" for _, n, (r, g, b) in PALETTE]
     L.append("};\n")

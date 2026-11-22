@@ -10,7 +10,8 @@
 #  1 2 3 4  per-instance color slots (an elf's suit and hat, a reindeer's nose ...)
 #  *  twinkling light (cycles through the light colors)
 #  !  lit window (warm yellow, flickers now and then)
-#  s  settled snow on a tree: white, but only once it has snowed in this scene
+#  s  settled snow on a tree: white, but only once it has snowed in this scene; before
+#     that nothing, or the sprite's bare color ("@tree_small bare=G": branch tips)
 
 # ---------------------------------------------------------------- walkers
 
@@ -491,7 +492,7 @@ wwwwUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUwwww
 .............wwwwwwwwwwwwwwwwwwww
 
 
-@tree_big
+@tree_big bare=G
 .......Y.......
 ......YYY......
 .......G.......
@@ -515,7 +516,7 @@ ssssssGGGssssss
 ......bbb......
 ......bbb......
 
-@tree_mid
+@tree_mid bare=g
 .....s.....
 ....sgs....
 ...gggggs..
@@ -531,7 +532,7 @@ sssgggggsss
 .....b.....
 ....bbb....
 
-@tree_small
+@tree_small bare=G
 ....s....
 ...sGs...
 ..GGGGG..
