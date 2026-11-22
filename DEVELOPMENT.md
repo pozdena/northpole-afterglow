@@ -20,8 +20,9 @@ fork, which some copies, zips and downloads lose; an `.hqx` cannot.
   of his box.
 - Lamp posts stand alone, or in a pair along one row, well apart.
 - The big tree's lights twinkle, the workshop windows glow and flicker, the chimney smokes.
-- Stars twinkle and a shooting star crosses now and then. The moon shows tonight's real
-  phase, worked out from the Mac's clock (which Afterglow passes through).
+- Stars twinkle and a shooting star crosses now and then. The moon shows tonight's
+  phase, worked out from the Mac's clock (which Afterglow passes through) and rounded to
+  the nearest of eight hand-drawn phases: new, crescent, quarter, gibbous, full, and back.
 - Snow comes and goes, building up and tapering off over several seconds. Clouds roll in
   from the upwind side as it starts, dimming the moon and stars, and roll on the same way
   when it stops. A flake that lands lies still for a second, then vanishes.
@@ -43,8 +44,11 @@ fork, which some copies, zips and downloads lose; an `.hqx` cannot.
 
 ```bash
 brew install m68k-elf-gcc m68k-elf-binutils ffmpeg
-make            # build/North Pole and build/North Pole.hqx
-make preview    # build/preview.mp4 + build/preview.gif, rendered natively
+make            # build/North Pole and build/North Pole.hqx, plus two test modules
+                # for local use only, never published: North Pole Preview, and North
+                # Pole Moon (a slider for the moon's phase)
+make preview    # build/preview.mp4 + build/preview.gif (the README's animation,
+                # docs/preview.gif), rendered natively
 make sheet      # build/sheet.png, every sprite
 make check      # diff-painter self-check across 8 seeds and scene changes
 ```
