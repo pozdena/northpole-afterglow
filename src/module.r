@@ -12,7 +12,7 @@
 read 'ADgm' (0, "North Pole Preview", locked) "build/pv/code.bin";
 
 data 'ADrk' (0, purgeable) {
-    $"33" "North Pole Preview 1.5" $"0D" "The twelve days, one a scene"
+    $"33" "North Pole Preview 1.6" $"0D" "The twelve days, one a scene"
 };
 
 data 'STR ' (128, "Credit Line") {
@@ -20,9 +20,9 @@ data 'STR ' (128, "Credit Line") {
 };
 
 data 'vers' (1) {
-    $"0150 8000 0000"
-    $"03" "1.5"
-    $"16" "North Pole Preview 1.5"
+    $"0160 8000 0000"
+    $"03" "1.6"
+    $"16" "North Pole Preview 1.6"
 };
 
 data 'TEXT' (1000) {
@@ -38,7 +38,7 @@ data 'TEXT' (1000) {
 read 'ADgm' (0, "North Pole Moon", locked) "build/mn/code.bin";
 
 data 'ADrk' (0, purgeable) {
-    $"29" "North Pole Moon 1.5" $"0D" "Any phase of the moon"
+    $"29" "North Pole Moon 1.6" $"0D" "Any phase of the moon"
 };
 
 data 'STR ' (128, "Credit Line") {
@@ -46,9 +46,9 @@ data 'STR ' (128, "Credit Line") {
 };
 
 data 'vers' (1) {
-    $"0150 8000 0000"
-    $"03" "1.5"
-    $"13" "North Pole Moon 1.5"
+    $"0160 8000 0000"
+    $"03" "1.6"
+    $"13" "North Pole Moon 1.6"
 };
 
 data 'TEXT' (1000) {
@@ -63,7 +63,7 @@ read 'ADgm' (0, "North Pole", locked) "build/code.bin";
 
 /* the name and credit After Dark shows */
 data 'ADrk' (0, purgeable) {
-    $"1E" "North Pole 1.5" $"0D" "Merry Christmas"
+    $"1E" "North Pole 1.6" $"0D" "Merry Christmas"
 };
 
 data 'STR ' (128, "Credit Line") {
@@ -71,9 +71,9 @@ data 'STR ' (128, "Credit Line") {
 };
 
 data 'vers' (1) {
-    $"0150 8000 0000"
-    $"03" "1.5"
-    $"0E" "North Pole 1.5"
+    $"0160 8000 0000"
+    $"03" "1.6"
+    $"0E" "North Pole 1.6"
 };
 #endif
 
