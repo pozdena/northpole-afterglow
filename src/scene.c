@@ -739,8 +739,8 @@ static void new_scene(Scene *s)
     if (s->moonTest) s->moonPhase = s->moonSet;     /* the moon test module's phase */
 
     /* the sky */
-    s->moonX = rnd_range(s, 6, FB_W - 14);
-    s->moonY = rnd_range(s, 2, 14);
+    s->moonX = rnd_range(s, 6, FB_W - 19);    /* the moon's top left; it is 13 px across */
+    s->moonY = rnd_range(s, 2, 12);
     s->nstars = rnd_range(s, 22, MAX_STARS);
     for (i = 0; i < s->nstars; i++) {
         Star *st = &s->stars[i];
@@ -1702,6 +1702,7 @@ static void sky_plot(const Scene *s, unsigned char *fb, short x, short y, unsign
     case C_DKGRAY:    level = 3; break;
     case C_DIMWHITE:  level = 4; break;
     case C_SNOWSHADE: level = 6; break;
+    case C_FADE7:     level = 7; break;
     case C_LTBLUE:    level = 7; break;
     default:          level = 8; break;
     }
@@ -1711,27 +1712,53 @@ static void sky_plot(const Scene *s, unsigned char *fb, short x, short y, unsign
     fb[y * FB_W + x] = RAMP[level];
 }
 
-/* The moon's eight phases, drawn by hand: new, waxing crescent, first quarter, waxing
-   gibbous, full, waning gibbous, last quarter, waning crescent. '#' lit, 'o' a sea (lit, a
-   little grayer; they stay where they are on the moon), '.' the dark part (a faint disc),
-   ' ' not the moon. Lit from the right while it waxes (as seen from the north). */
-static const char MOON[8][9][10] = {
-    { "  .....  ", " ....... ", ".........", ".........", ".........",
-      ".........", ".........", " ....... ", "  .....  " },
-    { "  ...##  ", " .....## ", ".......##", "......###", "......###",
-      "......###", ".......##", " .....## ", "  ...##  " },
-    { "  ..###  ", " ...#### ", "....#####", "....#####", "....##o##",
-      "....#o###", "....#####", " ...#### ", "  ..###  " },
-    { "  .####  ", " ..##### ", "..#######", ".#oo#####", ".#####o##",
-      ".####o###", "..##o####", " ..##### ", "  .####  " },
-    { "  #####  ", " ####### ", "#########", "##oo#####", "######o##",
-      "#####o###", "####o####", " ####### ", "  #####  " },
-    { "  ####.  ", " #####.. ", "#######..", "##oo####.", "######o#.",
-      "#####o##.", "####o##..", " #####.. ", "  ####.  " },
-    { "  ###..  ", " ####... ", "#####....", "##oo#....", "#####....",
-      "#####....", "#####....", " ####... ", "  ###..  " },
-    { "  ##...  ", " ##..... ", "##.......", "###......", "###......",
-      "###......", "##.......", " ##..... ", "  ##...  " }
+/* The moon's eight phases, drawn by hand, 13 px across: '#' lit, 'o' a sea and '+' the
+   edge of one (they stay where they are on the moon: Imbrium upper left, Serenitatis and
+   Tranquillitatis right of centre, Crisium by the right edge, Procellarum down the left,
+   Nubium low in the middle; none on a crescent, too thin to carry them), '.' the dark part
+   (only at new moon and the crescents, a faint earthshine), ' ' not the moon. Lit from the
+   right while it waxes (as seen from the north). */
+static const char MOON[8][13][14] = {
+    /* new */
+    { "    .....    ", "  .........  ", " ........... ", " ........... ",
+      ".............", ".............", ".............", ".............",
+      ".............", " ........... ", " ........... ", "  .........  ",
+      "    .....    " },
+    /* waxing crescent */
+    { "    ....#    ", "  .......##  ", " .........## ", " .........## ",
+      "..........###", "..........###", "..........###", "..........###",
+      "..........###", " .........## ", " .........## ", "  .......##  ",
+      "    ....#    " },
+    /* first quarter */
+    { "      ###    ", "      #####  ", "      ###### ", "      +#++## ",
+      "      #+oo+o#", "      #+oo###", "      ######+", "      #######",
+      "      o+#####", "      +##### ", "      ###### ", "      #####  ",
+      "      ###    " },
+    /* waxing gibbous */
+    { "     ####    ", "    #######  ", "    ++###### ", "   +oo+#++## ",
+      "   ooo#+oo+o#", "   o+##+oo###", "   o########+", "   +#########",
+      "   +#+o+#####", "   ##++##### ", "    ######## ", "    #######  ",
+      "     ####    " },
+    /* full */
+    { "    #####    ", "  #########  ", " ###++###### ", " ##+oo+#++## ",
+      "##+ooo#+oo+o#", "#+oo+##+oo###", "#+oo########+", "##o+#########",
+      "##++#+o+#####", " ####++##### ", " ########### ", "  #########  ",
+      "    #####    " },
+    /* waning gibbous */
+    { "    ####     ", "  #######    ", " ###++###    ", " ##+oo+#++   ",
+      "##+ooo#+oo   ", "#+oo+##+oo   ", "#+oo######   ", "##o+######   ",
+      "##++#+o+##   ", " ####++###   ", " ########    ", "  #######    ",
+      "    ####     " },
+    /* last quarter */
+    { "    ###      ", "  #####      ", " ###++#      ", " ##+oo+      ",
+      "##+ooo#      ", "#+oo+##      ", "#+oo###      ", "##o+###      ",
+      "##++#+o      ", " ####++      ", " ######      ", "  #####      ",
+      "    ###      " },
+    /* waning crescent */
+    { "    #....    ", "  ##.......  ", " ##......... ", " ##......... ",
+      "###..........", "###..........", "###..........", "###..........",
+      "###..........", " ##......... ", " ##......... ", "  ##.......  ",
+      "    #....    " }
 };
 
 /* which of the eight a phase (0 new .. 128 full .. 255) rounds to: 0 new .. 4 full .. 7 */
@@ -1743,15 +1770,18 @@ static short moon_shape(short phase)
 /* The moon in tonight's phase, rounded to the nearest of the eight. */
 static void draw_moon(const Scene *s, unsigned char *fb)
 {
-    const char (*art)[10] = MOON[moon_shape(s->moonPhase)];
+    const char (*art)[14] = MOON[moon_shape(s->moonPhase)];
     short dx, dy;
-    for (dy = -4; dy <= 4; dy++) {
-        for (dx = -4; dx <= 4; dx++) {
-            char ch = art[dy + 4][dx + 4];
+    for (dy = 0; dy < 13; dy++) {
+        for (dx = 0; dx < 13; dx++) {
+            char ch = art[dy][dx];
             unsigned char col;
-            if (ch == ' ') continue;
-            col = ch == '.' ? C_FADE1 : (ch == 'o' ? C_SNOWSHADE : C_WHITE);
-            sky_plot(s, fb, (short)(s->moonX + 4 + dx), (short)(s->moonY + 4 + dy), col);
+            if (ch == ' ') {
+                /* the unlit part with no earthshine still hides the stars behind it */
+                if (MOON[4][dy][dx] == ' ') continue;
+                col = C_BLACK;
+            } else col = ch == '.' ? C_FADE1 : (ch == 'o' ? C_SNOWSHADE : (ch == '+' ? C_FADE7 : C_WHITE));
+            sky_plot(s, fb, (short)(s->moonX + dx), (short)(s->moonY + dy), col);
         }
     }
 }
