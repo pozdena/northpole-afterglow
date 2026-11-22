@@ -8,23 +8,19 @@ A retro holiday screen saver module for [Afterglow](https://morphing.cloud/after
 
 You need a Mac with **macOS 14 (Sonoma) or later**.
 
-1. **Get Afterglow.** Download it from [morphing.cloud/afterglow](https://morphing.cloud/afterglow)
-   and open it. If you already have it, choose **Afterglow ▸ Check for Updates** first:
-   older versions don't list added modules in System Settings.
-2. **Download North Pole:** [**NorthPole.hqx**](https://github.com/pozdena/northpole-afterglow/releases/latest/download/NorthPole.hqx). It goes to your
-   Downloads folder.
-3. **Add it to Afterglow.** Drag the downloaded `NorthPole.hqx` onto Afterglow's window.
-   It appears in the list as **North Pole**, under Third Party Modules.
-4. **Make it your screen saver.** Open **System Settings ▸ Wallpaper ▸ Screen Saver** (on
-   some versions it is just **Screen Saver**) and select **Afterglow**. If Afterglow isn't
-   there, open the Afterglow app, choose **Install Afterglow Screen Saver** from its menus,
+1. Download and install [Afterglow](https://morphing.cloud/afterglow). If you already have it, ensure you're on the latest version, as North Pole may not install properly with older versions.
+2. Download the [North Pole screensaver module](https://github.com/pozdena/northpole-afterglow/releases/latest/download/NorthPole.hqx).
+3. Drag the downloaded NorthPole.hqx file onto Afterglow's window. It will appear in the list as "North Pole" under Third Party Modules.
+4. Open your macOS System Settings. Go to Wallpaper -> Screen Saver (on
+   some versions it's just Screen Saver) and select Afterglow. If Afterglow isn't
+   there, open the Afterglow app, choose "Install Afterglow Screen Saver" from its menus,
    and look again.
-5. **Pick North Pole.** Still in Screen Saver, click **Options…** under Afterglow, choose
-   **North Pole**, and close the sheet.
+5. Still in Screen Saver, click "Options…" under Afterglow, choose
+   "North Pole" (and optionally enable "CRT Effect" for extra retro feel) and close the sheet.
 
 ## Development
 
-Building it yourself, and how it works: [DEVELOPMENT.md](DEVELOPMENT.md).
+For technical details about how this module works, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 
