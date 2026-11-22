@@ -1711,25 +1711,46 @@ static void sky_plot(const Scene *s, unsigned char *fb, short x, short y, unsign
     fb[y * FB_W + x] = RAMP[level];
 }
 
-/* The moon in tonight's phase: a 9 px disc lit from the right while it waxes and from
-   the left while it wanes (as seen from the north), the dark part a faint disc. */
+/* The moon's eight phases, drawn by hand: new, waxing crescent, first quarter, waxing
+   gibbous, full, waning gibbous, last quarter, waning crescent. '#' lit, 'o' a sea (lit, a
+   little grayer; they stay where they are on the moon), '.' the dark part (a faint disc),
+   ' ' not the moon. Lit from the right while it waxes (as seen from the north). */
+static const char MOON[8][9][10] = {
+    { "  .....  ", " ....... ", ".........", ".........", ".........",
+      ".........", ".........", " ....... ", "  .....  " },
+    { "  ...##  ", " .....## ", ".......##", "......###", "......###",
+      "......###", ".......##", " .....## ", "  ...##  " },
+    { "  ..###  ", " ...#### ", "....#####", "....#####", "....##o##",
+      "....#o###", "....#####", " ...#### ", "  ..###  " },
+    { "  .####  ", " ..##### ", "..#######", ".#oo#####", ".#####o##",
+      ".####o###", "..##o####", " ..##### ", "  .####  " },
+    { "  #####  ", " ####### ", "#########", "##oo#####", "######o##",
+      "#####o###", "####o####", " ####### ", "  #####  " },
+    { "  ####.  ", " #####.. ", "#######..", "##oo####.", "######o#.",
+      "#####o##.", "####o##..", " #####.. ", "  ####.  " },
+    { "  ###..  ", " ####... ", "#####....", "##oo#....", "#####....",
+      "#####....", "#####....", " ####... ", "  ###..  " },
+    { "  ##...  ", " ##..... ", "##.......", "###......", "###......",
+      "###......", "##.......", " ##..... ", "  ##...  " }
+};
+
+/* which of the eight a phase (0 new .. 128 full .. 255) rounds to: 0 new .. 4 full .. 7 */
+static short moon_shape(short phase)
+{
+    return (short)(((phase + 16) >> 5) & 7);
+}
+
+/* The moon in tonight's phase, rounded to the nearest of the eight. */
 static void draw_moon(const Scene *s, unsigned char *fb)
 {
-    static const short COS32[32] = { 256, 251, 237, 213, 181, 142, 98, 50, 0, -50, -98, -142, -181, -213, -237, -251, -256, -251, -237, -213, -181, -142, -98, -50, 0, 50, 98, 142, 181, 213, 237, 251 };
-    static const short HALF_ROW[5] = { 1152, 1123, 1032, 859, 528 };   /* the disc's half width per row, 1/256 px */
-    long c = COS32[(s->moonPhase >> 3) & 31];
+    const char (*art)[10] = MOON[moon_shape(s->moonPhase)];
     short dx, dy;
     for (dy = -4; dy <= 4; dy++) {
-        long th = ((long)HALF_ROW[dy < 0 ? -dy : dy] * c) >> 8;
         for (dx = -4; dx <= 4; dx++) {
-            short lit;
+            char ch = art[dy + 4][dx + 4];
             unsigned char col;
-            if (dx * dx + dy * dy > 20) continue;
-            lit = s->moonPhase < 128 ? (long)dx * 256 > th : (long)dx * 256 < -th;
-            if (!lit) col = C_FADE1;
-            else if ((dx == -2 && dy == -1) || (dx == -1 && dy == -1) || (dx == 1 && dy == 1) ||
-                     (dx == 2 && dy == 0) || (dx == 0 && dy == 2)) col = C_SNOWSHADE;   /* the seas */
-            else col = C_WHITE;
+            if (ch == ' ') continue;
+            col = ch == '.' ? C_FADE1 : (ch == 'o' ? C_SNOWSHADE : C_WHITE);
             sky_plot(s, fb, (short)(s->moonX + 4 + dx), (short)(s->moonY + 4 + dy), col);
         }
     }
