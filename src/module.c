@@ -64,6 +64,14 @@ static short clamp_slider(short v)
     return v < 0 ? 0 : (v > 100 ? 100 : v);
 }
 
+/* A seed for the first scene. Afterglow starts a fresh emulated Mac each time the screen
+   saver comes on, so TickCount alone is nearly the same at every start and every run would
+   open on the same scene; the Mac's clock, which Afterglow passes through, tells them apart. */
+static unsigned long start_seed(void)
+{
+    return MacClock() * 2654435761UL ^ (unsigned long)TickCount() * 40503UL ^ 1;
+}
+
 long ad_main(Handle *storage, RgnHandle blankRgn, long message, GMParamBlock *params)
 {
     Globals *g = (storage && *storage) ? (Globals *)**storage : 0;
@@ -93,7 +101,7 @@ long ad_main(Handle *storage, RgnHandle blankRgn, long message, GMParamBlock *pa
         g->scene.previewDay = (short)(1 + (clamp_slider(params->controlValues[2]) * 11 + 50) / 100);
         /* and the checkbox is "show the gift right away", not the sleigh (always on here) */
         g->scene.giftNow = params->controlValues[3] != 0;
-        scene_init(&g->scene, (unsigned long)TickCount() * 2654435761UL + 1,
+        scene_init(&g->scene, start_seed(),
                    clamp_slider(params->controlValues[0]),
                    clamp_slider(params->controlValues[1]),
                    50,
@@ -103,13 +111,13 @@ long ad_main(Handle *storage, RgnHandle blankRgn, long message, GMParamBlock *pa
            through its phases */
         g->scene.moonTest = params->controlValues[3] != 0 ? 2 : 1;
         g->scene.moonSet = (short)(((long)clamp_slider(params->controlValues[2]) * 256 + 50) / 100 & 255);
-        scene_init(&g->scene, (unsigned long)TickCount() * 2654435761UL + 1,
+        scene_init(&g->scene, start_seed(),
                    clamp_slider(params->controlValues[0]),
                    clamp_slider(params->controlValues[1]),
                    50,
                    1);
 #else
-        scene_init(&g->scene, (unsigned long)TickCount() * 2654435761UL + 1,
+        scene_init(&g->scene, start_seed(),
                    clamp_slider(params->controlValues[0]),
                    clamp_slider(params->controlValues[1]),
                    clamp_slider(params->controlValues[2]),
