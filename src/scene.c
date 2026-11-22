@@ -2,13 +2,24 @@
 #include "scene.h"
 #include "sprites_gen.h"
 
-enum { K_SANTA, K_ELF, K_ELFGIFT, K_DEER, K_BUNNY,
+enum { K_SANTA, K_ELF, K_ELFGIFT, K_DEER, K_BUNNY, K_MRSCLAUS,
+       K_NUTCRACKER, K_JACK,     /* the visitors: one or the other drops by in some scenes */
        /* the twelve days' gifts (the partridge sits in its pear tree, a prop) */
        K_PARTRIDGE, K_BIRD, K_HEN, K_RING, K_GOOSE, K_SWAN, K_MAID, K_LADY, K_LORD, K_PIPER, K_DRUMMER };
 /* At the end of a scene Santa and Rudolph EXIT (walk off one edge, at their own pace) and
    are AWAY (flying the sleigh): there is one Santa and one Rudolph. */
 enum { ST_WALK, ST_REST, ST_EXIT, ST_AWAY,
-       ST_WAIT, ST_PARADE };     /* a gift that crosses the screen once: waiting, crossing */
+       ST_WAIT, ST_PARADE,       /* a gift that crosses the screen once: waiting, crossing */
+       ST_ENTER, ST_LEAVE,       /* a bunny or a visitor coming on from an edge, going off one */
+       ST_POP,                   /* the jack is out of his box */
+       /* a trip into the workshop: to the door, at it, inside, and out again */
+       ST_TODOOR, ST_ATDOOR, ST_INSIDE, ST_FROMDOOR };
+
+/* the workshop's door, in its sprite: columns 19..25, rows 15..24 */
+#define DOOR_LEFT 19
+#define DOOR_RIGHT 25
+#define DOOR_TOP 15
+#define DOOR_BOTTOM 24
 /* the scene's last act: Santa and Rudolph walk off, a beat, the sleigh flies over, a few
    seconds of quiet, then the blackout and a new scene */
 enum { END_NONE, END_WALKOFF, END_TAKEOFF, END_FLYING, END_QUIET };
@@ -215,6 +226,37 @@ static short place_prop(Scene *s, short spr, short xlo, short xhi)
     return -1;
 }
 
+/* Stand a prop with its feet on row base and its left edge at x, if the spot is free. */
+static short place_prop_at(Scene *s, short spr, short x, short base)
+{
+    short w = spr_w(spr), h = spr_h(spr), y = (short)(base - h + 1);
+    if (s->nprops >= MAX_PROPS || x < 0 || x > FB_W - w || y < 18 || base > GROUND_BOTTOM)
+        return -1;
+    if (overlaps(s, x, y, w, h)) return -1;
+    s->props[s->nprops].spr = (unsigned char)spr;
+    s->props[s->nprops].x = x;
+    s->props[s->nprops].y = y;
+    return s->nprops++;
+}
+
+/* Lamp posts: one anywhere, or two that line up along the same row, well apart, as
+   lamps along a lane would. */
+static void place_lamps(Scene *s, short n)
+{
+    short w = spr_w(SPR_LAMP), tries;
+    if (n >= 2) {
+        for (tries = 0; tries < 40; tries++) {
+            short gap = rnd_range(s, 56, 100);
+            short x = rnd_range(s, 2, (short)(FB_W - 2 - w - gap));
+            short base = rnd_range(s, GROUND_TOP + 14, GROUND_BOTTOM);
+            if (place_prop_at(s, SPR_LAMP, x, base) < 0) continue;
+            if (place_prop_at(s, SPR_LAMP, (short)(x + gap), base) >= 0) return;
+            s->nprops--;                    /* the second did not fit: try another row */
+        }
+    }
+    if (n >= 1) place_prop(s, SPR_LAMP, 0, FB_W);
+}
+
 static short actor_sprite(const Actor *a)
 {
     switch (a->kind) {
@@ -225,6 +267,11 @@ static short actor_sprite(const Actor *a)
         if (a->state == ST_REST) return SPR_DEERGRAZE;
         return a->frame ? SPR_DEER1 : SPR_DEER0;
     case K_BUNNY:   return a->frame ? SPR_BUNNY1 : SPR_BUNNY0;
+    case K_MRSCLAUS: return a->frame ? SPR_MRSCLAUS1 : SPR_MRSCLAUS0;
+    case K_NUTCRACKER: return a->frame ? SPR_NUT1 : SPR_NUT0;
+    case K_JACK:
+        if (a->state != ST_POP) return SPR_JACKBOX;
+        return a->frame ? SPR_JACKUP1 : SPR_JACKUP0;
     case K_BIRD:
         if (a->state == ST_REST) return a->frame ? SPR_BIRDSIT1 : SPR_BIRDSIT0;
         return a->frame ? SPR_BIRD1 : SPR_BIRD0;
@@ -267,6 +314,9 @@ static void add_actor(Scene *s, short kind)
     case K_ELFGIFT: a->speed = 7; break;
     case K_DEER:    a->speed = 6; break;
     case K_BUNNY:   a->speed = 10; break;
+    case K_MRSCLAUS: a->speed = 4; break;
+    case K_NUTCRACKER: a->speed = 5; break;
+    case K_JACK:    a->speed = 6; break;
     case K_BIRD:    a->speed = 9; break;
     case K_HEN:     a->speed = 4; break;
     case K_RING:    a->speed = 6; break;
@@ -281,6 +331,7 @@ static void add_actor(Scene *s, short kind)
     a->slots[1] = SUITS[pick][1];
     a->key = 0;
     a->tx = -1;
+    a->stay = rnd_range(s, 20, 80);
     a->slots[2] = C_DKBROWN;    /* a reindeer's nose ... */
     a->slots[3] = C_WHITE;
     w = spr_w(actor_sprite(a));
@@ -707,13 +758,21 @@ static void new_scene(Scene *s)
     }
 
     /* the workshop next: it is the biggest thing to fit */
+    s->workshop = -1;
+    s->doorUser = -1;
+    s->doorOpen = 0;
+    s->doorTimer = SECONDS(rnd_range(s, 15, 60));
+    if (s->force & 8) s->doorTimer = SECONDS(3);
     if (rnd(s, 5) != 0) {
         ws = place_prop(s, SPR_WORKSHOP, 2, FB_W - 2);
         if (ws >= 0) {
+            s->workshop = ws;
             s->chimneyX = s->props[ws].x + 25;
             s->chimneyY = s->props[ws].y;
         }
     }
+    /* the lamps before the smaller things, so a pair has room to line up */
+    place_lamps(s, rnd(s, 3));
     if (rnd(s, 2)) place_prop(s, SPR_TREE_BIG, 0, FB_W);
     n = rnd_range(s, 1, 3);
     for (i = 0; i < n; i++) place_prop(s, SPR_TREE_MID, 0, FB_W);
@@ -723,11 +782,10 @@ static void new_scene(Scene *s)
     if (rnd(s, 2)) place_prop(s, SPR_POLE, 0, FB_W);
     n = rnd(s, 3);
     for (i = 0; i < n; i++) place_prop(s, SPR_GIFTS, 0, FB_W);
-    n = rnd(s, 3);
-    for (i = 0; i < n; i++) place_prop(s, SPR_LAMP, 0, FB_W);
 
     /* the folks */
     add_actor(s, K_SANTA);
+    if (rnd(s, 4) == 0 || (s->force & 1)) add_actor(s, K_MRSCLAUS);
     n = 1 + crowd / 34;
     for (i = 0; i < n; i++) add_actor(s, rnd(s, 3) ? K_ELF : K_ELFGIFT);
     n = 1 + crowd / 50;
@@ -739,8 +797,29 @@ static void new_scene(Scene *s)
             s->rudolph = i;
             break;
         }
+    /* the bunnies come and go: each is about a third of the time in sight */
     n = 1 + crowd / 34;
-    for (i = 0; i < n; i++) add_actor(s, K_BUNNY);
+    for (i = 0; i < n && s->nactors < MAX_ACTORS; i++) {
+        Actor *a = &s->actors[s->nactors];
+        add_actor(s, K_BUNNY);
+        if (rnd(s, 3) == 0) {
+            a->stay = (short)SECONDS(rnd_range(s, 10, 40));
+        } else {
+            a->state = ST_AWAY;
+            a->stay = (short)SECONDS(rnd_range(s, 2, 80));
+        }
+    }
+    /* now and then a visitor: a nutcracker, or a jack-in-the-box */
+    if (rnd(s, 8) == 0 || (s->force & 6)) {
+        short kind = (s->force & 6) ? ((s->force & 2) ? K_NUTCRACKER : K_JACK)
+                                    : (rnd(s, 2) ? K_NUTCRACKER : K_JACK);
+        if (s->nactors < MAX_ACTORS) {
+            Actor *a = &s->actors[s->nactors];
+            add_actor(s, kind);
+            a->state = ST_AWAY;
+            a->stay = (short)SECONDS((s->force & 6) ? 2 : rnd_range(s, 5, 45));
+        }
+    }
     add_gift(s);
 
     /* weather: maybe it is already snowing */
@@ -864,12 +943,328 @@ static void step_partridge(Scene *s, Actor *a)
     a->timer = rnd_range(s, 25, 110);
 }
 
+/* Santa, the elves and Mrs Claus: they stand about, and go in and out of the workshop */
+static short is_person(const Actor *a)
+{
+    return a->kind == K_SANTA || a->kind == K_ELF || a->kind == K_ELFGIFT || a->kind == K_MRSCLAUS;
+}
+
+/* ticks per step of a walker's legs */
+static short walk_rate(const Actor *a)
+{
+    if (a->kind == K_ELF || a->kind == K_ELFGIFT) return 5;
+    if (a->kind == K_SWAN) return 12;
+    if (a->kind == K_NUTCRACKER) return 6;
+    return 8;
+}
+
+/* Walk toward column tx (the left edge) and row ty, across and up or down the ground at
+   once. Returns 1 on arrival. */
+static short walk_to(Scene *s, Actor *a, short tx, short ty)
+{
+    short dx16 = (short)((tx << 4) - a->x16), moving = 0;
+    if (dx16 > a->speed || dx16 < -a->speed) {
+        a->dir = (unsigned char)(dx16 < 0);
+        a->x16 += dx16 < 0 ? -a->speed : a->speed;
+        moving = 1;
+    } else {
+        a->x16 = (short)(tx << 4);
+    }
+    if (a->base != ty) {
+        if ((s->tick & 3) == 0) a->base += a->base < ty ? 1 : -1;
+        moving = 1;
+    }
+    if (!moving) return 1;
+    a->anim++;
+    a->frame = (unsigned char)((a->anim / walk_rate(a)) & 1);
+    return 0;
+}
+
+/* where someone stands to go in at the workshop door: in front of it, on the row just
+   below the workshop (one row up from there and the workshop is drawn over them) */
+static short door_x(const Scene *s, const Actor *a)
+{
+    return (short)(s->props[s->workshop].x + (DOOR_LEFT + DOOR_RIGHT) / 2 - spr_w(actor_sprite(a)) / 2);
+}
+
+static short door_row(const Scene *s)
+{
+    return (short)(s->props[s->workshop].y + spr_h(SPR_WORKSHOP));
+}
+
+/* someone fancies a trip into the workshop: not too often, one at a time, and Santa not
+   when it is nearly time for the sleigh */
+static short may_go_in(const Scene *s, const Actor *a)
+{
+    if (s->workshop < 0 || s->doorUser >= 0 || s->doorTimer > 0 || s->ending) return 0;
+    if (a->kind == K_SANTA && s->sceneTicks > s->sceneLength - SECONDS(40)) return 0;
+    return 1;
+}
+
+/* a trip into the workshop and back out, a few seconds later */
+static void step_door(Scene *s, Actor *a, short w)
+{
+    short front = door_row(s);
+    switch (a->state) {
+    case ST_TODOOR:
+        if (walk_to(s, a, door_x(s, a), front)) {
+            a->state = ST_ATDOOR;
+            a->frame = 0;
+            a->timer = 12;
+            s->doorOpen = 30;
+        }
+        break;
+    case ST_ATDOOR:
+        if (--a->timer > 0) break;
+        /* in they go. An elf leaves a present inside, or comes out with one */
+        a->state = ST_INSIDE;
+        a->anim = 0;
+        a->timer = (short)SECONDS(rnd_range(s, 3, 8));
+        if (a->kind == K_ELFGIFT) a->kind = K_ELF;
+        else if (a->kind == K_ELF && rnd(s, 2)) a->kind = K_ELFGIFT;
+        break;
+    case ST_INSIDE:
+        if (--a->timer > 0) break;
+        if (!a->anim) {                     /* the door opens ... */
+            a->anim = 1;
+            a->timer = 10;
+            s->doorOpen = 36;
+            break;
+        }
+        /* ... and out they come, to somewhere in front of the workshop */
+        w = spr_w(actor_sprite(a));
+        a->x16 = (short)(door_x(s, a) << 4);
+        a->base = front;
+        a->tx = (short)(door_x(s, a) + rnd_range(s, -50, 50));
+        if (a->tx < 0) a->tx = 0;
+        if (a->tx > FB_W - w) a->tx = (short)(FB_W - w);
+        a->ty = front + 4 <= GROUND_BOTTOM ? rnd_range(s, (short)(front + 4), GROUND_BOTTOM) : front;
+        a->state = ST_FROMDOOR;
+        a->anim = 0;
+        break;
+    default:                                /* ST_FROMDOOR */
+        if (walk_to(s, a, a->tx, a->ty)) {
+            a->state = ST_REST;
+            a->frame = 0;
+            a->anim = 0;
+            a->timer = rnd_range(s, 30, 120);
+            a->stay = rnd_range(s, 15, 50);
+            s->doorUser = -1;
+            s->doorTimer = (s->force & 8) ? SECONDS(3) : SECONDS(rnd_range(s, 30, 90));
+        }
+        break;
+    }
+}
+
+/* standing about: now and then a look the other way, an elf's little hop, a chuckle
+   from Santa */
+static void fidget(Scene *s, Actor *a)
+{
+    if (a->anim > 0) {
+        a->anim--;
+        a->hop = a->kind == K_SANTA ? (short)((a->anim >> 2) & 1) : (short)(a->anim >= 4);
+        return;
+    }
+    a->hop = 0;
+    if (--a->stay > 0) return;
+    {
+        short roll = rnd(s, 10);
+        if (roll < 4) a->dir ^= 1;
+        else if (roll < 6 && a->kind != K_MRSCLAUS) a->anim = a->kind == K_SANTA ? 24 : 8;
+    }
+    a->stay = rnd_range(s, 40, 140);
+}
+
+/* off an edge, out of sight, for its time away; then back in from an edge */
+static short step_away(Scene *s, Actor *a, short w, short visitLo, short visitHi)
+{
+    if (--a->stay > 0) return 1;
+    a->dir = (unsigned char)rnd(s, 2);
+    a->base = rnd_range(s, GROUND_TOP + 14, GROUND_BOTTOM);
+    a->x16 = (short)((a->dir ? FB_W : -w) << 4);
+    a->state = ST_ENTER;
+    a->anim = 0;
+    a->hop = 0;
+    a->frame = 0;
+    a->stay = (short)SECONDS(rnd_range(s, visitLo, visitHi));
+    return 0;
+}
+
+/* coming on, going off: free of the screen's edges. Returns 1 once that is done. */
+static short cross_edge(Scene *s, Actor *a, short w, short awayLo, short awayHi)
+{
+    if (a->state == ST_ENTER) {
+        if (a->x16 >= 0 && a->x16 <= ((FB_W - w) << 4)) {
+            a->state = ST_WALK;
+            a->timer = rnd_range(s, 60, 200);
+            return 1;
+        }
+    } else if (a->state == ST_LEAVE) {
+        if (a->x16 < -(w << 4) || a->x16 > (FB_W << 4)) {
+            a->state = ST_AWAY;
+            a->hop = 0;
+            a->stay = (short)SECONDS(rnd_range(s, awayLo, awayHi));
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* its visit is up: off by the nearer edge */
+static void head_off(Actor *a, short w)
+{
+    a->state = ST_LEAVE;
+    a->dir = (unsigned char)(((a->x16 >> 4) + w / 2) < FB_W / 2);
+}
+
+/* Bunnies sit, then hop: 14 ticks in the air, a little arc. They stay a while, hop off,
+   and come back some time later, so any one is in sight about a third of the time. */
+static void step_bunny(Scene *s, Actor *a, short w)
+{
+    if (a->state == ST_AWAY) {
+        step_away(s, a, w, 15, 40);
+        return;
+    }
+    if (a->state == ST_WALK || a->state == ST_REST) a->stay--;
+    if (a->state == ST_REST) {
+        a->frame = 0;
+        a->hop = 0;
+        if (a->stay <= 0) { head_off(a, w); a->anim = 0; return; }
+        if (--a->timer <= 0) {
+            a->state = ST_WALK;
+            a->anim = 0;
+            if (rnd(s, 5) == 0) a->dir ^= 1;
+        }
+        return;
+    }
+    {
+        short t = ++a->anim;
+        a->frame = 1;
+        a->hop = (short)((t * (14 - t)) / 12);
+        a->x16 += a->dir ? -a->speed : a->speed;
+        if (t >= 14) {
+            a->hop = 0;
+            a->frame = 0;
+            a->anim = 0;
+            if (cross_edge(s, a, w, 40, 90)) return;
+            if (a->state == ST_WALK) {
+                if (a->stay <= 0) head_off(a, w);
+                else if (rnd(s, 3) == 0) {          /* usually another hop or two, then a rest */
+                    a->state = ST_REST;
+                    a->timer = rnd_range(s, 20, 120);
+                }
+            }
+        }
+    }
+    if (a->state == ST_WALK || a->state == ST_REST) {
+        if (a->x16 <= 0) { a->x16 = 0; a->dir = 0; }
+        if (a->x16 >= ((FB_W - w) << 4)) { a->x16 = (short)((FB_W - w) << 4); a->dir = 1; }
+    }
+}
+
+/* The visitors. The nutcracker marches, halts at attention, about-faces. The jack-in-the-
+   box hops along in his box, and now and then springs out, wobbles, and goes back in.
+   Each comes on from an edge, stays a while, goes off, and may come back later. */
+static void step_visitor(Scene *s, Actor *a, short w)
+{
+    short jack = a->kind == K_JACK;
+    if (a->state == ST_AWAY) {
+        step_away(s, a, w, 25, 50);
+        return;
+    }
+    if (a->state == ST_POP) {
+        short t = ++a->anim;
+        /* boing: a quick wobble, then a slow sway */
+        a->frame = (unsigned char)(t < 24 ? (t / 3) & 1 : (t / 12) & 1);
+        if (--a->timer <= 0) {
+            a->state = ST_REST;
+            a->frame = 0;
+            a->anim = 0;
+            a->timer = rnd_range(s, 15, 40);
+        }
+        return;
+    }
+    if (a->state == ST_REST) {
+        a->frame = 0;
+        a->hop = 0;
+        a->stay--;
+        if (--a->timer > 0) return;
+        if (a->stay <= 0) { head_off(a, w); return; }
+        a->state = ST_WALK;
+        a->anim = 0;
+        a->timer = rnd_range(s, 60, 200);
+        if (rnd(s, 3) == 0) a->dir ^= 1;
+        return;
+    }
+    /* walking (or hopping), coming on or going off */
+    if (a->state == ST_WALK) a->stay--;
+    if (jack) {
+        short t = ++a->anim;
+        if (t <= 16) {                          /* a hop */
+            a->hop = (short)((t * (16 - t)) / 22);
+            a->x16 += a->dir ? -a->speed : a->speed;
+        } else {
+            a->hop = 0;
+            if (t >= 16 + 10) {                 /* a breath between hops */
+                a->anim = 0;
+                if (cross_edge(s, a, w, 40, 120)) return;
+                if (a->state == ST_WALK) {
+                    if (a->stay <= 0) head_off(a, w);
+                    else if (rnd(s, 7) == 0) {
+                        a->state = ST_POP;
+                        a->anim = 0;
+                        a->timer = (short)SECONDS(rnd_range(s, 2, 4));
+                    } else if (rnd(s, 8) == 0) {
+                        a->state = ST_REST;
+                        a->timer = rnd_range(s, 30, 90);
+                    } else if (rnd(s, 6) == 0) {
+                        a->dir ^= 1;
+                    }
+                }
+            }
+        }
+    } else {
+        a->x16 += a->dir ? -a->speed : a->speed;
+        a->anim++;
+        a->frame = (unsigned char)((a->anim / walk_rate(a)) & 1);
+        if (cross_edge(s, a, w, 40, 120)) return;
+        if (a->state == ST_WALK && --a->timer <= 0) {
+            short roll = rnd(s, 10);
+            a->frame = 0;
+            if (a->stay <= 0) head_off(a, w);
+            else if (roll < 4) {                /* halt, at attention */
+                a->state = ST_REST;
+                a->timer = rnd_range(s, 45, 150);
+                if (rnd(s, 2)) a->dir ^= 1;     /* and about face */
+            } else {
+                a->timer = rnd_range(s, 60, 200);
+            }
+        }
+    }
+    if (a->state == ST_WALK || a->state == ST_REST) {
+        if (a->x16 <= 0) { a->x16 = 0; a->dir = 0; }
+        if (a->x16 >= ((FB_W - w) << 4)) { a->x16 = (short)((FB_W - w) << 4); a->dir = 1; }
+    }
+}
+
 static void step_actor(Scene *s, Actor *a)
 {
     short w = spr_w(actor_sprite(a));
     short minX16 = 0, maxX16 = (short)((FB_W - w) << 4);
 
     if (a->state == ST_WAIT) return;
+    if (a->kind == K_BUNNY) {
+        step_bunny(s, a, w);
+        return;
+    }
+    if (a->kind == K_NUTCRACKER || a->kind == K_JACK) {
+        step_visitor(s, a, w);
+        return;
+    }
+    if (a->state >= ST_TODOOR) {
+        step_door(s, a, w);
+        return;
+    }
     if (a->kind == K_PARTRIDGE) {
         step_partridge(s, a);
         return;
@@ -889,33 +1284,7 @@ static void step_actor(Scene *s, Actor *a)
         maxX16 = (short)((p->x + spr_w(SPR_POND) - w - 3) << 4);
     }
 
-    if (a->kind == K_BUNNY) {
-        /* bunnies sit, then hop: 14 ticks in the air, a little arc */
-        if (a->state == ST_REST) {
-            a->frame = 0;
-            a->hop = 0;
-            if (--a->timer <= 0) {
-                a->state = ST_WALK;
-                a->anim = 0;
-                if (rnd(s, 5) == 0) a->dir ^= 1;
-            }
-        } else {
-            short t = ++a->anim;
-            a->frame = 1;
-            a->hop = (short)((t * (14 - t)) / 12);
-            a->x16 += a->dir ? -a->speed : a->speed;
-            if (t >= 14) {
-                a->hop = 0;
-                a->frame = 0;
-                a->anim = 0;
-                /* usually another hop or two, then a rest */
-                if (rnd(s, 3) == 0) {
-                    a->state = ST_REST;
-                    a->timer = rnd_range(s, 20, 120);
-                }
-            }
-        }
-    } else if (a->state == ST_AWAY) {
+    if (a->state == ST_AWAY) {
         return;                     /* up in the sky */
     } else if (a->state == ST_EXIT) {
         a->x16 += a->dir ? -a->speed : a->speed;
@@ -925,20 +1294,36 @@ static void step_actor(Scene *s, Actor *a)
         return;                     /* free of the screen edges while leaving */
     } else if (a->state == ST_REST) {
         a->frame = 0;
+        if (is_person(a)) fidget(s, a);
         if (--a->timer <= 0) {
             a->state = ST_WALK;
+            a->hop = 0;
+            a->anim = 0;
             a->timer = rnd_range(s, 60, 300);
             if (rnd(s, 3) == 0) a->dir ^= 1;
         }
     } else {
-        short rate = (a->kind == K_ELF || a->kind == K_ELFGIFT) ? 5 : (a->kind == K_SWAN ? 12 : 8);
         a->x16 += a->dir ? -a->speed : a->speed;
         a->anim++;
-        a->frame = (unsigned char)((a->anim / rate) & 1);
+        a->frame = (unsigned char)((a->anim / walk_rate(a)) & 1);
         if (a->kind == K_GOOSE && rnd(s, 400) == 0) lay_egg(s, a, w);
         if (--a->timer <= 0) {
             short roll = rnd(s, 10);
-            if (roll < 4) {
+            if (is_person(a) && may_go_in(s, a) && rnd(s, 3) == 0) {
+                /* off to the workshop for a bit */
+                s->doorUser = (short)(a - s->actors);
+                a->state = ST_TODOOR;
+                a->anim = 0;
+                return;
+            }
+            if (is_person(a) && roll < 5) {
+                /* a while standing about */
+                a->state = ST_REST;
+                a->anim = 0;
+                a->frame = 0;
+                a->stay = rnd_range(s, 15, 60);
+                a->timer = (short)SECONDS(rnd_range(s, 2, 12));
+            } else if (roll < 4) {
                 a->state = ST_REST;
                 a->timer = rnd_range(s, a->kind == K_DEER ? 90 : 30, a->kind == K_DEER ? 300 : 120);
             } else if (roll < 6) {
@@ -1108,6 +1493,10 @@ static void step_sky(Scene *s)
         }
     }
 
+    /* the workshop door */
+    if (s->doorOpen > 0) s->doorOpen--;
+    if (s->doorTimer > 0 && s->doorUser < 0) s->doorTimer--;
+
     /* the day's gift sets off across the screen */
     if (s->paradeTimer > 0 && --s->paradeTimer == 0)
         for (i = 0; i < s->nactors; i++)
@@ -1174,6 +1563,8 @@ static void step_ending(Scene *s)
     switch (s->ending) {
     case END_NONE:
         if (s->sceneTicks < s->sceneLength) return;
+        for (i = 0; i < n; i++)
+            if (walkers[i]->state >= ST_TODOOR) return;     /* Santa is out of the workshop first */
         {
             long left = 0, right = 0;
             short dir;
@@ -1186,6 +1577,7 @@ static void step_ending(Scene *s)
             for (i = 0; i < n; i++) {
                 walkers[i]->state = ST_EXIT;
                 walkers[i]->dir = (unsigned char)dir;
+                walkers[i]->hop = 0;
             }
         }
         s->ending = END_WALKOFF;
@@ -1405,7 +1797,8 @@ static void scene_render(Scene *s, unsigned char *fb)
         s->drawIdx[n++] = i;
     }
     for (i = 0; i < s->nactors; i++) {
-        if (s->actors[i].state == ST_AWAY || s->actors[i].state == ST_WAIT) continue;
+        if (s->actors[i].state == ST_AWAY || s->actors[i].state == ST_WAIT ||
+            s->actors[i].state == ST_INSIDE) continue;
         /* perched up on something, it sorts with that thing; in flight, by its own row */
         s->drawKey[n] = s->actors[i].key && s->actors[i].state != ST_PARADE
             ? s->actors[i].key : s->actors[i].base;
@@ -1426,6 +1819,13 @@ static void scene_render(Scene *s, unsigned char *fb)
         if (d < 100) {
             Prop *p = &s->props[d];
             blit(s, fb, p->spr, p->x, p->y, 0, 0);
+            if (d == s->workshop && s->doorOpen > 0) {
+                /* the door swung in, the lit room beyond */
+                short r, c;
+                for (r = DOOR_TOP; r <= DOOR_BOTTOM; r++)
+                    for (c = DOOR_LEFT + 2; c <= DOOR_RIGHT; c++)
+                        plot(fb, (short)(p->x + c), (short)(p->y + r), r == DOOR_BOTTOM ? C_ORANGE : C_YELLOW);
+            }
         } else {
             Actor *a = &s->actors[d - 100];
             short spr = actor_sprite(a);

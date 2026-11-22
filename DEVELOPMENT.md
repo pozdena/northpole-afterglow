@@ -10,9 +10,15 @@ fork, which some copies, zips and downloads lose; an `.hqx` cannot.
 
 ## What it does
 
-- Santa strolls, stops, turns around. Elves scurry, some carrying a present. Reindeer
-  wander and stop to graze; one of them is always Rudolph. Bunnies hop and sit. Things
-  pass in front of and behind each other by depth.
+- Santa strolls, and stands about a while now and then, looking around (or chuckling).
+  Elves scurry, some carrying a present. In some scenes Mrs. Claus is out too. Now and
+  then one of them goes into the workshop and comes back out a few seconds later (an elf
+  may come out with a present, or leave one inside). Reindeer wander and stop to graze;
+  one of them is always Rudolph. Bunnies hop in from the edges, sit, and hop off again.
+  Things pass in front of and behind each other by depth.
+- Once in a while a nutcracker marches in, or a jack-in-the-box hops in and springs out
+  of his box.
+- Lamp posts stand alone, or in a pair along one row, well apart.
 - The big tree's lights twinkle, the workshop windows glow and flicker, the chimney smokes.
 - Stars twinkle and a shooting star crosses now and then. The moon shows tonight's real
   phase, worked out from the Mac's clock (which Afterglow passes through).

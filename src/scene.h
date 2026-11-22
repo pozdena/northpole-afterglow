@@ -47,7 +47,10 @@ typedef struct {
     short key;                 /* depth to sort by when not its feet's row (perched up on
                                   something sorts with that thing); 0 = base */
     short tx, ty, sy;          /* a bird: where it is flying to (tx < 0: away off an edge),
-                                  and the row it took off from */
+                                  and the row it took off from; someone leaving the
+                                  workshop: where they are walking to */
+    short stay;                /* a bunny or a visitor: ticks left in its visit, or away;
+                                  someone standing about: ticks till the next fidget */
     unsigned char slots[4];
 } Actor;
 
@@ -124,6 +127,12 @@ typedef struct Scene {
     Flake flakes[MAX_FLAKES];
 
     short chimneyX, chimneyY;  /* -1 when there is no workshop */
+    short workshop;            /* the workshop prop's index, -1 if none */
+    short doorUser;            /* who is going in or out of the workshop, -1 if no one */
+    short doorOpen;            /* ticks the door stays open */
+    long doorTimer;            /* ticks till someone may next go in */
+    short force;               /* testing only: 1 Mrs Claus, 2 the nutcracker, 4 the
+                                  jack-in-the-box, 8 frequent trips to the workshop */
     short smokeTimer;
     Particle parts[MAX_PARTICLES];
 

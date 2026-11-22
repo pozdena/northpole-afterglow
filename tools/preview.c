@@ -42,6 +42,10 @@ int main(int argc, char **argv)
     int cur = 0, x, y, k, sleighSeen = 0;
     int flights = 0, lastEnding = 0, cloudy = 0, lastGiftPrint = 0;
     long walkoffAt = 0;
+    long bunnyFrames = 0, bunnySeen = 0, visitorFrames = 0, scenes = 1, mrsScenes = 0, visitorScenes = 0;
+    long trips = 0, pops = 0;
+    unsigned char lastState[MAX_ACTORS];
+    memset(lastState, 0xFF, sizeof lastState);
     unsigned char *row = malloc((size_t)FB_W * scale * 3);
 
     /* the clock: argv[8] as YYYYMMDD, else now; NP_GIFT=1..12 forces a gift */
@@ -62,8 +66,17 @@ int main(int argc, char **argv)
         if (getenv("NP_GIFT")) scene.giftForce = (short)atoi(getenv("NP_GIFT"));
         if (getenv("NP_PREVIEW")) scene.previewDay = (short)atoi(getenv("NP_PREVIEW"));   /* 1..12 */
         if (getenv("NP_NOW")) scene.giftNow = 1;
+        /* NP_FORCE: 1 Mrs Claus, 2 the nutcracker, 4 the jack-in-the-box, 8 frequent
+           trips into the workshop (bits add) */
+        if (getenv("NP_FORCE")) scene.force = (short)atoi(getenv("NP_FORCE"));
     }
     scene_init(&scene, seed, snow, change, crowd, sleigh);
+#define COUNT_SCENE() do { int q, m = 0, v = 0; \
+        for (q = 0; q < scene.nactors; q++) { \
+            if (scene.actors[q].kind == K_MRSCLAUS) m = 1; \
+            if (scene.actors[q].kind == K_NUTCRACKER || scene.actors[q].kind == K_JACK) v = 1; } \
+        mrsScenes += m; visitorScenes += v; } while (0)
+    COUNT_SCENE();
     fprintf(stderr, "moon phase %d/256, gift %d\n", scene.moonPhase, scene.gift);
     memset(fb[1], 0xFF, FB_SIZE);      /* first frame paints everything */
     memset(screen, 0xEE, FB_SIZE);
@@ -103,6 +116,9 @@ int main(int argc, char **argv)
         if (lastGiftPrint && scene.blackout == 0) {
             fprintf(stderr, "new scene: gift %d\n", scene.gift);
             lastGiftPrint = 0;
+            scenes++;
+            COUNT_SCENE();
+            memset(lastState, 0xFF, sizeof lastState);
         }
         if (!scene.ending && scene.sleighActive) {
             fprintf(stderr, "frame %ld: the sleigh flew before the scene's end\n", f);
@@ -124,6 +140,33 @@ int main(int argc, char **argv)
             fprintf(stderr, "frame %ld: a scene with no Rudolph\n", f);
             return 1;
         }
+        {
+            /* the comings and goings: counted, and kept in bounds */
+            int i;
+            for (i = 0; i < scene.nactors && !scene.blackout; i++) {
+                Actor *a = &scene.actors[i];
+                short w = spr_w(actor_sprite(a));
+                if (a->kind == K_BUNNY) {
+                    bunnyFrames++;
+                    if (a->state != ST_AWAY) bunnySeen++;
+                }
+                if ((a->kind == K_NUTCRACKER || a->kind == K_JACK) && a->state != ST_AWAY) visitorFrames++;
+                if (a->state == ST_INSIDE && lastState[i] != ST_INSIDE) trips++;
+                if (a->state == ST_POP && lastState[i] != ST_POP) pops++;
+                lastState[i] = a->state;
+                if ((a->state == ST_WALK || a->state == ST_REST) && a->kind != K_PARTRIDGE &&
+                    !is_flyer(a) && (a->x16 < 0 || a->x16 > ((FB_W - w) << 4))) {
+                    fprintf(stderr, "frame %ld: actor %d (kind %d, state %d, x16 %d, w %d) is off the screen while walking\n",
+                            f, i, a->kind, a->state, a->x16, w);
+                    return 1;
+                }
+                if (a->state != ST_AWAY && !is_flyer(a) && a->kind != K_PARTRIDGE &&
+                    (a->base < GROUND_TOP || a->base >= FB_H)) {
+                    fprintf(stderr, "frame %ld: actor %d (kind %d) stands on row %d\n", f, i, a->kind, a->base);
+                    return 1;
+                }
+            }
+        }
         scene_render(&scene, fb[cur]);
         present_diff(0, fb[cur ^ 1], fb[cur]);
         if (memcmp(screen, fb[cur], FB_SIZE) != 0) {
@@ -142,5 +185,9 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "%ld frames ok, %ld runs total, at most %ld runs in one frame (after the first)\n",
             frames, runs, maxRuns);
+    fprintf(stderr, "bunnies in sight %.0f%% of the time; %ld scenes, Mrs Claus in %ld, a visitor in %ld "
+            "(in sight %.0f s); %ld trips into the workshop; the jack popped %ld times\n",
+            bunnyFrames ? 100.0 * bunnySeen / bunnyFrames : 0.0, scenes, mrsScenes, visitorScenes,
+            visitorFrames / (double)SIM_HZ, trips, pops);
     return 0;
 }
