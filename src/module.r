@@ -75,15 +75,10 @@ data 'vers' (1) {
     $"03" "1.5"
     $"0E" "North Pole 1.5"
 };
-
-data 'TEXT' (1000) {
-    "NORTH POLE: Santa, his elves, the reindeer and a few white bunnies "
-    "potter about the workshop on a winter night, drawn the way a 1980 "
-    "video game would have drawn them. Trees twinkle, the chimney smokes, "
-    "and clouds hide the moon and stars while it snows. The moon shows "
-    "tonight's phase."
-    $"0D0D"
 #endif
+
+/* help text: only the test modules carry it (North Pole itself has no About text) */
+#if defined(PREVIEW) || defined(MOON)
     "Snowfall: how often it snows."
     $"0D"
     "New scene every: when the time is up, Santa and Rudolph walk off and "
@@ -93,6 +88,7 @@ data 'TEXT' (1000) {
     "Crowd: how many elves, reindeer and bunnies are out."
     $"00"
 };
+#endif
 
 /* the heap After Dark should leave the module */
 data 'sysz' (0, "North Pole heap requirement") {
