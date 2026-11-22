@@ -156,7 +156,12 @@ int main(int argc, char **argv)
                     if (a->state != ST_AWAY) bunnySeen++;
                 }
                 if ((a->kind == K_NUTCRACKER || a->kind == K_JACK) && a->state != ST_AWAY) visitorFrames++;
-                if (a->state == ST_INSIDE && lastState[i] != ST_INSIDE) trips++;
+                if (a->state == ST_INSIDE && lastState[i] != ST_INSIDE) {
+                    static const char *const WHO[] = { "Santa", "an elf", "an elf", "", "", "Mrs Claus" };
+                    fprintf(stderr, "  %s goes into the workshop at %.1f s\n",
+                            a->kind <= K_MRSCLAUS ? WHO[a->kind] : "someone", f / (double)SIM_HZ);
+                    trips++;
+                }
                 if (a->state == ST_POP && lastState[i] != ST_POP) pops++;
                 lastState[i] = a->state;
                 if ((a->state == ST_WALK || a->state == ST_REST) && a->kind != K_PARTRIDGE &&

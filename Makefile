@@ -101,10 +101,13 @@ build/preview: tools/preview.c src/scene.c src/scene.h src/present.c src/sprites
 sheet: src/sprites_gen.h | build
 	python3 tools/gen_sprites.py art/sprites.txt src/sprites_gen.h --sheet build/sheet.png
 
+# The README's animation (docs/preview.gif): seed 1 on 25 November 2026, a full moon and
+# no twelve days. From 34 s: clouds roll in over the moon, snow settles on the trees, an
+# elf goes into the workshop, Santa and Rudolph walk off and the sleigh flies over.
 preview: build/preview
-	./build/preview 75 11 4 70 0 60 1 | ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 \
+	./build/preview 82 1 4 70 0 60 1 20261125 | ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 \
 	    -s 640x480 -r 30 -i - -c:v libx264 -pix_fmt yuv420p build/preview.mp4
-	ffmpeg -loglevel error -y -ss 3 -t 12 -i build/preview.mp4 \
+	ffmpeg -loglevel error -y -ss 34 -t 46 -i build/preview.mp4 \
 	    -vf "fps=15,scale=480:-1:flags=neighbor,split[a][b];[a]palettegen=max_colors=32[p];[b][p]paletteuse=dither=none" \
 	    build/preview.gif
 
