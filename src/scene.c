@@ -308,7 +308,7 @@ static void add_parade(Scene *s, short kind, short count, short gap)
 
 /* ------------------------------------------------------------------ the flock
    The doves and the calling birds behave like birds: they fly in, land on the ground to
-   peck or perch on top of something (a tree, the workshop's roof, the snowman, a lamp),
+   peck or perch on top of something (anything wide enough: a big tree, the workshop's roof),
    sit a while, then take off, to land somewhere else or fly off and come back later.
    The golden rings do the same in the sky: they float in, hang in an arc over a spot,
    spinning and sparkling, then drift on. */
