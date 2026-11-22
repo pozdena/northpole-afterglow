@@ -736,6 +736,7 @@ static void new_scene(Scene *s)
     }
     s->gift = pick_gift(s);
     s->moonPhase = s->sceneClock ? moon_phase(s->sceneClock) : rnd(s, 256);
+    if (s->moonTest) s->moonPhase = s->moonSet;     /* the moon test module's phase */
 
     /* the sky */
     s->moonX = rnd_range(s, 6, FB_W - 14);
@@ -1627,6 +1628,11 @@ static void scene_step(Scene *s)
         return;
     }
     s->sceneTicks++;
+    if (s->moonTest == 2 && (s->tick & 7) == 0) {
+        /* the moon test, running: a lunar month in about 68 seconds */
+        s->moonSet = (short)((s->moonSet + 1) & 255);
+        s->moonPhase = s->moonSet;
+    }
 
     for (i = 0; i < s->nactors; i++) step_actor(s, &s->actors[i]);
     step_weather(s);
@@ -1729,15 +1735,32 @@ static void draw_moon(const Scene *s, unsigned char *fb)
     }
 }
 
+/* a 3 x 5 font for the test modules' labels: rows of 3 bits, top first: 0..9, then D, E, C */
+static const unsigned char FONT[13][5] = {
+    { 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 7, 1, 7 }, { 5, 5, 7, 1, 1 },
+    { 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 1, 1, 1 }, { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 },
+    { 6, 5, 5, 5, 6 }, { 7, 4, 6, 4, 7 }, { 3, 4, 4, 4, 3 }
+};
+
+static void draw_glyph(unsigned char *fb, short g, short x, short y)
+{
+    short r, c;
+    for (r = 0; r < 5; r++)
+        for (c = 0; c < 3; c++)
+            if (FONT[g][r] & (4 >> c)) plot(fb, (short)(x + c), (short)(y + r), C_YELLOW);
+}
+
+/* The moon test module's label, top left: the moon's age in days, 0 (new) .. 29. */
+static void draw_moon_age(const Scene *s, unsigned char *fb)
+{
+    short age = (short)((s->moonPhase * 30) >> 8);
+    draw_glyph(fb, (short)(age / 10), 3, 3);
+    draw_glyph(fb, (short)(age % 10), 7, 3);
+}
+
 /* The preview module's date, top left: "DEC 14" in a 3 x 5 font. */
 static void draw_preview_date(const Scene *s, unsigned char *fb)
 {
-    /* rows of 3 bits, top first: 0..9, then D, E, C */
-    static const unsigned char FONT[13][5] = {
-        { 7, 5, 5, 5, 7 }, { 2, 6, 2, 2, 7 }, { 7, 1, 7, 4, 7 }, { 7, 1, 7, 1, 7 }, { 5, 5, 7, 1, 1 },
-        { 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 1, 1, 1 }, { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 },
-        { 6, 5, 5, 5, 6 }, { 7, 4, 6, 4, 7 }, { 3, 4, 4, 4, 3 }
-    };
     short year, month, day, g[5], i, r, c;
     clock_date(s->sceneClock, &year, &month, &day);
     g[0] = 10; g[1] = 11; g[2] = 12;          /* DEC: the preview only ever shows December */
@@ -1857,4 +1880,5 @@ static void scene_render(Scene *s, unsigned char *fb)
         if (f->live && f->y16 >= 0) plot(fb, f->x16 >> 4, f->y16 >> 4, C_WHITE);
     }
     if (s->previewDay) draw_preview_date(s, fb);
+    if (s->moonTest) draw_moon_age(s, fb);
 }

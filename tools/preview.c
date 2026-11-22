@@ -69,6 +69,11 @@ int main(int argc, char **argv)
         /* NP_FORCE: 1 Mrs Claus, 2 the nutcracker, 4 the jack-in-the-box, 8 frequent
            trips into the workshop (bits add) */
         if (getenv("NP_FORCE")) scene.force = (short)atoi(getenv("NP_FORCE"));
+        /* NP_MOON=0..255: the moon test module at that phase; NP_MOONRUN=1 runs it */
+        if (getenv("NP_MOON")) {
+            scene.moonTest = getenv("NP_MOONRUN") ? 2 : 1;
+            scene.moonSet = (short)(atoi(getenv("NP_MOON")) & 255);
+        }
     }
     scene_init(&scene, seed, snow, change, crowd, sleigh);
 #define COUNT_SCENE() do { int q, m = 0, v = 0; \

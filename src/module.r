@@ -5,9 +5,10 @@
  * GMParamBlock.controlValues[0..3]; their resource names are the labels.
  */
 
-/* Built twice: plain, and with -d PREVIEW as "North Pole Preview", whose code pretends
-   each scene is the next of the twelve days of Christmas (see src/module.c). */
-#ifdef PREVIEW
+/* Built three times: plain; with -d PREVIEW as "North Pole Preview", whose code pretends
+   each scene is the next of the twelve days of Christmas; and with -d MOON as "North Pole
+   Moon", for trying out the moon's phases (see src/module.c). */
+#if defined(PREVIEW)
 read 'ADgm' (0, "North Pole Preview", locked) "build/pv/code.bin";
 
 data 'ADrk' (0, purgeable) {
@@ -32,6 +33,30 @@ data 'TEXT' (1000) {
     "night's moon, and the date shows top left. With Show the gift right "
     "away on, the gift is out the moment a scene starts, and a parade keeps "
     "coming back. Your Mac's clock is not touched."
+    $"0D0D"
+#elif defined(MOON)
+read 'ADgm' (0, "North Pole Moon", locked) "build/mn/code.bin";
+
+data 'ADrk' (0, purgeable) {
+    $"29" "North Pole Moon 1.4" $"0D" "Any phase of the moon"
+};
+
+data 'STR ' (128, "Credit Line") {
+    $"26" "North Pole Moon: any phase of the moon"
+};
+
+data 'vers' (1) {
+    $"0140 8000 0000"
+    $"03" "1.4"
+    $"13" "North Pole Moon 1.4"
+};
+
+data 'TEXT' (1000) {
+    "NORTH POLE MOON: the North Pole module with the moon in whatever phase "
+    "you pick on the Moon slider, from new through first quarter, full and "
+    "last quarter back to new. Turn on Run through the phases and the moon "
+    "goes through a whole month in about a minute. Top left is the moon's age "
+    "in days, 0 (new) to 29. Set Snowfall to Never: clouds hide the moon."
     $"0D0D"
 #else
 read 'ADgm' (0, "North Pole", locked) "build/code.bin";
@@ -74,7 +99,11 @@ data 'sysz' (0, "North Pole heap requirement") {
     $"0001 4000"
 };
 
+#if defined(MOON)
+data 'sVal' (1000, "Snowfall:") { $"0000" };          /* never: clouds hide the moon */
+#else
 data 'sVal' (1000, "Snowfall:") { $"0032" };
+#endif
 data 'sUnt' (1000, "Snowfall Units") {
     $"0005"
     $"0000" $"05" "Never"
@@ -84,8 +113,10 @@ data 'sUnt' (1000, "Snowfall Units") {
     $"0064" $"06" "Always"
 };
 
-#ifdef PREVIEW
+#if defined(PREVIEW)
 data 'sVal' (1001, "New scene every:") { $"0000" };   /* a minute: a new day each minute */
+#elif defined(MOON)
+data 'sVal' (1001, "New scene every:") { $"0000" };
 #else
 data 'sVal' (1001, "New scene every:") { $"0016" };
 #endif
@@ -103,7 +134,7 @@ data 'sUnt' (1001, "New scene Units") {
     $"0063" $"06" "10 min"
 };
 
-#ifdef PREVIEW
+#if defined(PREVIEW)
 /* the preview's third slider is the date it pretends it is: December 14 .. 25 */
 data 'sVal' (1002, "December:") { $"0000" };
 data 'sUnt' (1002, "December Units") {
@@ -121,6 +152,17 @@ data 'sUnt' (1002, "December Units") {
     $"005B" $"02" "24"
     $"0064" $"02" "25"
 };
+#elif defined(MOON)
+/* the moon test's third slider is the moon's phase */
+data 'sVal' (1002, "Moon:") { $"0032" };
+data 'sUnt' (1002, "Moon Units") {
+    $"0005"
+    $"0000" $"03" "New"
+    $"0019" $"0D" "First quarter"
+    $"0032" $"04" "Full"
+    $"004B" $"0C" "Last quarter"
+    $"0064" $"03" "New"
+};
 #else
 data 'sVal' (1002, "Crowd:") { $"0032" };
 data 'sUnt' (1002, "Crowd Units") {
@@ -131,9 +173,11 @@ data 'sUnt' (1002, "Crowd Units") {
 };
 #endif
 
-#ifdef PREVIEW
+#if defined(PREVIEW)
 /* the preview's checkbox: the day's gift out from the start of every scene */
 data 'xVal' (1003, "Show the gift right away") { $"0001" };
+#elif defined(MOON)
+data 'xVal' (1003, "Run through the phases") { $"0000" };
 #else
 data 'xVal' (1003, "Santa's sleigh") { $"0001" };
 #endif

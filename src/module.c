@@ -98,6 +98,16 @@ long ad_main(Handle *storage, RgnHandle blankRgn, long message, GMParamBlock *pa
                    clamp_slider(params->controlValues[1]),
                    50,
                    1);
+#elif defined(NP_MOON)
+        /* the moon test: the third slider is the moon's phase, the checkbox runs it
+           through its phases */
+        g->scene.moonTest = params->controlValues[3] != 0 ? 2 : 1;
+        g->scene.moonSet = (short)(((long)clamp_slider(params->controlValues[2]) * 256 + 50) / 100 & 255);
+        scene_init(&g->scene, (unsigned long)TickCount() * 2654435761UL + 1,
+                   clamp_slider(params->controlValues[0]),
+                   clamp_slider(params->controlValues[1]),
+                   50,
+                   1);
 #else
         scene_init(&g->scene, (unsigned long)TickCount() * 2654435761UL + 1,
                    clamp_slider(params->controlValues[0]),

@@ -94,6 +94,9 @@ typedef struct Scene {
     short paradeGap;           /* px between the members of a parade */
     short previewDay;          /* the preview module: 1..12, the day of Christmas it pretends
                                   it is (its date slider); 0 = the real date */
+    short moonTest;            /* the moon test module: 0 off, 1 the moon at moonSet, 2 the
+                                  moon running through its phases, a month a minute or so */
+    short moonSet;             /* its phase, 0 new .. 128 full .. 255 */
     unsigned long sceneClock;  /* the clock this scene was built for */
     Egg eggs[MAX_EGGS];
 
