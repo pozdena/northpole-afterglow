@@ -159,6 +159,13 @@ static void blit(Scene *s, unsigned char *fb, short spr, short x, short y, short
                 row[xx] = (unsigned char)(px - 1);
             } else if (px < PX_TWINKLE) {
                 row[xx] = slots ? slots[px - PX_SLOT] : C_WHITE;
+            } else if (px == PX_SETTLED) {
+                /* snow settles on a tree a pixel at a time, in an order fixed per tree */
+                unsigned short k = (unsigned short)(c * 181 + r * 97 + x * 59);
+                k ^= (unsigned short)(k >> 5);
+                k = (unsigned short)(k * 0x2F);
+                k ^= (unsigned short)(k >> 7);
+                if ((short)(k & 4095) < s->treeSnow) row[xx] = C_WHITE;
             } else if (px == PX_TWINKLE) {
                 /* each bulb steps through the colors on its own phase */
                 unsigned short k = (unsigned short)(xx * 3 + yy * 5 + slowTick);
@@ -343,7 +350,7 @@ static short top_row(short spr, short c)
     short w = spr_w(spr), h = spr_h(spr), r;
     const unsigned char *src = SPR_PX + ((SPR_DIM[spr][2] << 8) | SPR_DIM[spr][3]);
     for (r = 0; r < h; r++)
-        if (src[r * w + c]) return r;
+        if (src[r * w + c] && src[r * w + c] != PX_SETTLED) return r;
     return -1;
 }
 
@@ -594,7 +601,7 @@ static void add_gift(Scene *s)
             a->hop = 0;
             a->timer = rnd_range(s, 30, 90);
             a->x16 = (short)((p->x + 4) << 4);
-            a->base = (short)(p->y - 1);           /* its feet on the snow atop the tree */
+            a->base = (short)p->y;                 /* on the leaves; snow settles round its feet */
             a->key = (short)(p->y + spr_h(SPR_PEARTREE));   /* drawn with its tree */
         }
         break;
@@ -743,8 +750,9 @@ static void new_scene(Scene *s)
         s->snowing = 0;
         s->weatherTimer = SECONDS(rnd_range(s, 10, 120 - s->snowSetting));
     }
-    /* already snowing: the clouds are already in */
+    /* already snowing: the clouds are already in, and the trees already white */
     s->cloudIn = s->snowing ? CLOUD_FULL : 0;
+    s->treeSnow = s->snowing ? 4096 : 0;
     s->cloudOut = 0;
     s->cloudFrom = rnd(s, 2);
 
@@ -977,6 +985,13 @@ static void step_weather(Scene *s)
             s->snowRate -= s->snowRateStep;
             if (s->snowRate < goal) s->snowRate = goal;
         }
+    }
+
+    /* snow settles on the trees while it falls, faster the heavier it is */
+    if (s->snowRate > 0 && s->treeSnow < 4096) {
+        long most = (long)MAX_AIR * 4096 / FLAKE_LIFE;
+        s->treeSnow += (short)(3 + (s->snowRate * 5) / most);
+        if (s->treeSnow > 4096) s->treeSnow = 4096;
     }
 
     /* the cloud cover: in while it snows, on its way when it stops. A change of mind

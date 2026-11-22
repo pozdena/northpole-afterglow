@@ -118,6 +118,8 @@ typedef struct Scene {
     short wind;                /* 1/16 px per tick */
     short cloudIn, cloudOut;   /* the cloud cover's leading and trailing edges, 1/16 px */
     short cloudFrom;           /* 0: clouds come from the left, 1: from the right */
+    short treeSnow;            /* snow settled on the trees, 0 (none yet) .. 4096 (all of
+                                  it); it builds while it snows and stays till the scene ends */
     long weatherTimer;
     Flake flakes[MAX_FLAKES];
 

@@ -10,6 +10,7 @@ Pixel encoding in the generated table:
     100 + k     per-instance color slot k (art chars '1'..'4' -> k = 0..3)
     200         twinkling light ('*')
     201         lit window ('!')
+    202         settled snow ('s': white once a snowfall has built it up)
 """
 import argparse
 import pathlib
@@ -48,7 +49,7 @@ PALETTE = [
     (None, "SKIN3",    (0xB4, 0x78, 0x4C)),
 ]
 CHAR_INDEX = {c: i for i, (c, _, _) in enumerate(PALETTE) if c}
-SLOT_BASE, TWINKLE, WINDOW = 100, 200, 201
+SLOT_BASE, TWINKLE, WINDOW, SETTLED = 100, 200, 201, 202
 
 
 def parse(path):
@@ -87,6 +88,8 @@ def encode(ch, where):
         return TWINKLE
     if ch == "!":
         return WINDOW
+    if ch == "s":
+        return SETTLED
     if ch in CHAR_INDEX:
         return CHAR_INDEX[ch] + 1
     sys.exit(f"{where}: unknown pixel '{ch}'")
@@ -111,7 +114,8 @@ def write_header(path, data, table):
     for i, (_, cname, _) in enumerate(PALETTE):
         L.append(f"#define C_{cname} {i}")
     L.append(f"#define NUM_COLORS {len(PALETTE)}")
-    L.append(f"#define PX_SLOT {SLOT_BASE}\n#define PX_TWINKLE {TWINKLE}\n#define PX_WINDOW {WINDOW}\n")
+    L.append(f"#define PX_SLOT {SLOT_BASE}\n#define PX_TWINKLE {TWINKLE}\n#define PX_WINDOW {WINDOW}\n"
+             f"#define PX_SETTLED {SETTLED}\n")
     L.append("static const unsigned char PAL_RGB[NUM_COLORS][3] = {")
     L += [f"    {{0x{r:02X}, 0x{g:02X}, 0x{b:02X}}}, /* {n} */" for _, n, (r, g, b) in PALETTE]
     L.append("};\n")
@@ -158,6 +162,8 @@ def write_sheet(path, sprites, scale=6):
                         col = PALETTE[CHAR_INDEX[ch]][2]
                     elif ch in "1234":
                         col = slot_demo[int(ch) - 1]
+                    elif ch == "s":
+                        col = PALETTE[CHAR_INDEX["W"]][2]
                     elif ch == "*":
                         col = [(0xD8, 0x38, 0x34), (0xFC, 0xE0, 0x5C), (0x40, 0x60, 0xE0), (0x54, 0xD4, 0xD4)][(x + y) % 4]
                     else:
