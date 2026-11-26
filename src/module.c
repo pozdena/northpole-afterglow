@@ -12,6 +12,9 @@ typedef struct {
     short rowY[FB_H + 1];      /* screen y of each logical row edge */
     RGBColor pal[NUM_COLORS];
     long lastTick;
+    long startTick;            /* TickCount at msgInitialize */
+    unsigned long startClock;  /* the Mac's clock at msgInitialize */
+    short waiting;             /* the first scene waits for the clock to tick */
     short cur;                 /* fb[cur] is drawn next; fb[cur ^ 1] is on screen */
     short color;               /* Color QuickDraw present */
     short lastColor;
@@ -65,8 +68,10 @@ static short clamp_slider(short v)
 }
 
 /* A seed for the first scene. Afterglow starts a fresh emulated Mac each time the screen
-   saver comes on, so TickCount alone is nearly the same at every start and every run would
-   open on the same scene; the Mac's clock, which Afterglow passes through, tells them apart. */
+   saver comes on, so TickCount alone is the same at every start and every run would open on
+   the same scene; the Mac's clock, which Afterglow passes through, tells them apart. But the
+   screen saver's host sets that clock only after the module starts, so the first scene is
+   built once the clock has ticked (see msgDrawFrame), not at msgInitialize. */
 static unsigned long start_seed(void)
 {
     return MacClock() * 2654435761UL ^ (unsigned long)TickCount() * 40503UL ^ 1;
@@ -95,7 +100,7 @@ long ad_main(Handle *storage, RgnHandle blankRgn, long message, GMParamBlock *pa
             g->pal[i].blue = (unsigned short)(PAL_RGB[i][2] * 257);
         }
         fit_screen(g, blankRgn, params);
-        g->scene.clock = MacClock();
+        g->scene.clock = g->startClock = MacClock();
 #ifdef NP_PREVIEW
         /* the third slider is the date, 14..25 December, not the crowd */
         g->scene.previewDay = (short)(1 + (clamp_slider(params->controlValues[2]) * 11 + 50) / 100);
@@ -125,7 +130,8 @@ long ad_main(Handle *storage, RgnHandle blankRgn, long message, GMParamBlock *pa
 #endif
         g->cur = 0;
         fill_bytes(g->fb[1], 0xFF, FB_SIZE);   /* nothing known on screen yet */
-        g->lastTick = TickCount();
+        g->lastTick = g->startTick = TickCount();
+        g->waiting = 1;
         return 0;
     }
 
@@ -138,6 +144,17 @@ long ad_main(Handle *storage, RgnHandle blankRgn, long message, GMParamBlock *pa
         long now, steps;
         if (!g) return 0;
         now = TickCount();
+        if (g->waiting) {
+            /* the screen stays black until the clock ticks over (at most a second where it
+               is live from the start), then the first scene is dealt from the real time */
+            unsigned long c = MacClock();
+            if (c == g->startClock && now - g->startTick < 180) return 0;
+            g->waiting = 0;
+            g->scene.clock = c;
+            scene_restart(&g->scene, start_seed());
+            g->lastTick = now;
+            return 0;
+        }
         steps = (now - g->lastTick) / 2;      /* 60 ticks a second, the scene runs at 30 */
         if (steps <= 0) return 0;
         if (steps > 4) {

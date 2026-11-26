@@ -860,6 +860,15 @@ static void scene_init(Scene *s, unsigned long seed, short snow, short changeSet
     new_scene(s);
 }
 
+/* Deal the first scene again from a new seed, keeping the settings scene_init took. */
+static void scene_restart(Scene *s, unsigned long seed)
+{
+    s->rng = seed ? seed : 0x1234567UL;
+    rnd16(s); rnd16(s);
+    s->tick = 0;
+    new_scene(s);
+}
+
 /* ------------------------------------------------------------------ simulation */
 
 static Particle *new_particle(Scene *s)
